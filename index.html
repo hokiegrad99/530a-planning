@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Track yearly contributions to children's 530A accounts with ease. Set up limits, manage child profiles, and view real-time family updates.">
+  <title>530A Family Contribution Tracker</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="logo-area">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        <h1>530A Family Tracker</h1>
+      </div>
+      <div class="header-actions">
+        <div class="year-selector">
+          <label for="yearSelect">Year:</label>
+          <select id="yearSelect" aria-label="Select calendar year">
+            <!-- Populated dynamically via JS -->
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-content">
+    <!-- Summary Dashboard Card -->
+    <section class="summary-section card glass">
+      <div class="summary-details">
+        <div class="summary-stat">
+          <p class="stat-label">Total Contributions for <span id="summaryYear">2026</span></p>
+          <p class="stat-value" id="summaryTotal">$0.00</p>
+        </div>
+        <div class="summary-stat text-right">
+          <p class="stat-label">Remaining limit across children</p>
+          <p class="stat-value text-accent" id="summaryRemaining">$0.00</p>
+        </div>
+      </div>
+      <div class="summary-progress-wrapper">
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="summaryProgressBar" style="width: 0%"></div>
+        </div>
+        <div class="progress-labels">
+          <span id="summaryChildrenCount">0 children</span>
+          <span id="summaryPercentage">0% of max limit reached</span>
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button id="openContributeBtn" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Log Contribution
+        </button>
+        <button id="openManageChildrenBtn" class="btn btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Manage Children
+        </button>
+      </div>
+    </section>
+
+    <!-- Children Section -->
+    <section class="children-section">
+      <h2 class="section-title">Children Account Status</h2>
+      <div class="children-grid" id="childrenGrid">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- Recent Activity Section -->
+    <section class="activity-section card glass">
+      <h2 class="section-title">Recent Contributions</h2>
+      <div class="table-container">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Child</th>
+              <th>Contributor</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="activityTableBody">
+            <!-- Populated dynamically via JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noActivityMessage" class="no-data-message" style="display: none;">
+        No contributions logged for this year yet.
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>530A Account Contribution Limit: $5,000.00/child/year. Contributions must stop the calendar year the child turns 18.</p>
+  </footer>
+
+  <!-- Modal: Log Contribution -->
+  <div id="contributeModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content card glass animate-scale">
+      <div class="modal-header">
+        <h2>Log a Contribution</h2>
+        <button class="close-modal-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="contributeForm" class="modal-form">
+        <div class="form-group">
+          <label for="contribChild">Child Profile</label>
+          <select id="contribChild" required>
+            <option value="" disabled selected>Select child...</option>
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="contribName">Your Name (Contributor)</label>
+          <input type="text" id="contribName" placeholder="e.g., Grandma, Dad, Uncle Joe" required autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label for="contribAmount">Contribution Amount ($)</label>
+          <div class="input-prefix-wrapper">
+            <span class="input-prefix">$</span>
+            <input type="number" id="contribAmount" step="0.01" min="0.01" placeholder="0.00" required>
+          </div>
+          <p id="liveLimitMessage" class="form-help-text"></p>
+        </div>
+
+        <div class="form-group">
+          <label for="contribDate">Contribution Date</label>
+          <input type="date" id="contribDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="contribNote">Note (Optional)</label>
+          <textarea id="contribNote" rows="2" placeholder="e.g., Birthday gift, monthly contribution"></textarea>
+        </div>
+
+        <div id="contributeError" class="alert alert-danger" style="display: none;"></div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Log Contribution</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Manage Children -->
+  <div id="manageChildrenModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content card glass modal-large animate-scale">
+      <div class="modal-header">
+        <h2>Manage Children Profiles</h2>
+        <button class="close-modal-btn" aria-label="Close modal">&times;</button>
+      </div>
+      
+      <div class="manage-grid">
+        <!-- Column 1: Existing Profiles -->
+        <div class="profiles-list-section">
+          <h3>Existing Children</h3>
+          <div id="childrenList" class="profiles-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Column 2: Add New Child Form -->
+        <div class="add-child-section">
+          <h3>Add Child Profile</h3>
+          <form id="addChildForm" class="modal-form">
+            <div class="form-group">
+              <label for="childName">Child's Name</label>
+              <input type="text" id="childName" placeholder="Full Name" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="childBirthDate">Date of Birth</label>
+              <input type="date" id="childBirthDate" required>
+            </div>
+
+            <div id="addChildError" class="alert alert-danger" style="display: none;"></div>
+            
+            <button type="submit" class="btn btn-primary btn-full">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Profile
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Child Contribution Details -->
+  <div id="childDetailsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content card glass modal-large animate-scale">
+      <div class="modal-header">
+        <h2 id="childDetailsTitle">Child's Account Details</h2>
+        <button class="close-modal-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="child-details-summary">
+        <div class="detail-badge">DOB: <span id="childDetailsDob">N/A</span></div>
+        <div class="detail-badge">Current Age: <span id="childDetailsAge">N/A</span></div>
+        <div class="detail-badge badge-accent">Limit Status for <span id="childDetailsYear">2026</span>: <span id="childDetailsLimitStatus">$0.00 / $5,000.00</span></div>
+      </div>
+      
+      <h3>Contribution List for <span id="childDetailsListYear">2026</span></h3>
+      <div class="table-container max-height-300">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Contributor</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="childDetailsTableBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noChildDetailsMessage" class="no-data-message" style="display: none;">
+        No contributions logged for this year.
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (Compat version for simple browser script loading) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Project Configuration -->
+  <script src="js/config.js"></script>
+
+  <!-- Client JavaScript -->
+  <script src="js/app.js"></script>
+</body>
+</html>
