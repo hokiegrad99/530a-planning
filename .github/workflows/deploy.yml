@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Avoid racing concurrent pushes into the gh-pages branch.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      # build-config.js will exit 1 if the secret is missing or invalid, which
+      # fails the workflow and prevents shipping a broken app to Pages.
+      - name: Generate js/config.js from secret
+        run: node scripts/build-config.js
+        env:
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_CONFIG_JSON }}
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          # Keep repo internals (rules, server, scripts, build artifacts) out of
+          # the public deploy. The set below is intentionally explicit; if it
+          # blocks something the app actually needs at runtime, remove that
+          # line.
+          exclude_paths: |
+            .github
+            scripts
+            firestore.rules
+            server.js
+            package.json
+            package-lock.json
+            js/config.example.js
+            js/config.template.js
+            README.md

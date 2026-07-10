@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function myEmail()    { return request.auth.token.email; }
+
+    // Reads the family doc once per request that needs membership info.
+    function getFamily(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId));
+    }
+    function isMember(familyId) {
+      return getFamily(familyId).data.members[myEmail()] != null;
+    }
+    function isAdmin(familyId) {
+      return getFamily(familyId).data.members[myEmail()] == 'admin';
+    }
+
+    match /families/{familyId} {
+      // Read: any signed-in email that is in this family's members map.
+      allow read: if isSignedIn() && isMember(familyId);
+
+      // Create: must include yourself as 'admin' in the new doc so you own it.
+      allow create: if isSignedIn()
+                       && request.resource.data.members[myEmail()] == 'admin';
+
+      // Update: must currently be admin AND must remain admin afterwards
+      // (this is what blocks accidental self-demotion).
+      allow update: if isSignedIn()
+                       && isAdmin(familyId)
+                       && request.resource.data.members[myEmail()] == 'admin';
+
+      // No hard delete; soft-delete is out of scope of this iteration.
+      allow delete: if false;
+
+      match /children/{childId} {
+        // Split read vs write explicitly. Don't use the `allow read, write`
+        // shorthand here; it would OR with the admin grant below and let
+        // viewers write children.
+        allow read:  if isSignedIn() && isMember(familyId);
+        allow write: if isSignedIn() && isAdmin(familyId);
+      }
+
+      match /contributions/{contributionId} {
+        allow read: if isSignedIn() && isMember(familyId);
+
+        // Members create contributions; schema validated here:
+        //   - amount is positive and <= 5000 (per-write cap)
+        //   - the contribution year's < child's birthYear + 18
+        // Corrections: delete + new write. No editing of existing rows.
+        allow create: if isSignedIn()
+                        && isMember(familyId)
+                        && request.resource.data.amount is number
+                        && request.resource.data.amount > 0
+                        && request.resource.data.amount <= 5000
+                        && int(request.resource.data.date.split('-')[0])
+                           < (get(/databases/$(database)/documents/
+                                families/$(familyId)/children/
+                                $(request.resource.data.childId)).data.birthYear + 18);
+
+        allow update: if false;
+        allow delete: if isSignedIn() && isAdmin(familyId);
+      }
+    }
+  }
+}

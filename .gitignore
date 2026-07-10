@@ -1,0 +1,31 @@
+# Build-injected Firebase client config. The committed template lives at
+# js/config.example.js. The runtime file is generated either:
+#   - in dev:    by copying the template and editing,
+#   - in deploy: by scripts/build-config.js from the FIREBASE_CONFIG_JSON secret.
+js/config.js
+js/config.local.js
+
+# One-off service-account credential used by the migration script.
+service-account.json
+service-account*.json
+
+# Firebase local artefacts
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
