@@ -373,15 +373,42 @@ async function signOutAndReroute() {
 async function routeToFamily(user) {
   state.currentUserEmail = user.email;
   try {
-    const snap = await db.collection('families')
-      .where('members.' + user.email, '!=', null)
+    // Primary: indexed array-contains lookup. Works for families whose create /
+    // invite / remove sites already maintain `memberEmails` alongside `members`.
+    // `array-contains` is not affected by dots in the lookup value, so emails
+    // are safe as array elements.
+    let snap = await db.collection('families')
+      .where('memberEmails', 'array-contains', user.email)
       .limit(1)
       .get();
-    if (snap.empty) {
-      showCreateFamilyModal();
-    } else {
+    if (!snap.empty) {
       const familyDoc = snap.docs[0];
       enterFamily(familyDoc.id, familyDoc.data());
+      return;
+    }
+
+    // Fallback: scan all families and check the legacy `members` map directly.
+    // Covers family docs that pre-date the array (created before this code
+    // landed, or produced by an older migrate-to-families run).
+    const allSnap = await db.collection('families').get();
+    const match = allSnap.docs.find(d => {
+      const m = d.data().members;
+      return m && m[user.email] != null;
+    });
+    if (match) {
+      enterFamily(match.id, match.data());
+      // Self-heal: backfill `memberEmails` once so future visits hit the
+      // fast path. Admins only — viewers can't pass the update rule, so
+      // attempting would just throw and log. An admin's invite/remove will
+      // also keep the array in sync going forward.
+      if (!Array.isArray(match.data().memberEmails) && isAdmin()) {
+        const emails = Object.keys(match.data().members || {});
+        db.collection('families').doc(match.id)
+          .update({ memberEmails: emails })
+          .catch(err => console.warn('memberEmails backfill failed:', err));
+      }
+    } else {
+      showCreateFamilyModal();
     }
   } catch (err) {
     showCriticalError(
@@ -414,7 +441,12 @@ async function handleCreateFamilySubmit(e) {
   const familyName = dom.familyNameInput.value.trim();
   if (!familyName) return;
   try {
-    const familyData = { familyName, members: { [state.currentUserEmail]: 'admin' } };
+    const adminEmail = state.currentUserEmail;
+    const familyData = {
+      familyName,
+      members:      { [adminEmail]: 'admin' },
+      memberEmails: [adminEmail],
+    };
     const ref = await db.collection('families').add(familyData);
     hideModal(dom.createFamilyModal);
     enterFamily(ref.id, familyData);
@@ -1007,8 +1039,11 @@ async function handleInviteMemberSubmit(e) {
     return;
   }
   try {
-    await db.collection('families').doc(state.currentFamilyId)
-      .update({ ['members.' + email]: role });
+    // Atomic: map set + array insert land in the same update() call.
+    await db.collection('families').doc(state.currentFamilyId).update({
+      ['members.' + email]: role,
+      memberEmails: firebase.firestore.FieldValue.arrayUnion(email),
+    });
     dom.inviteEmailInput.value = '';
     renderMembersList();
   } catch (err) {
@@ -1019,10 +1054,13 @@ async function handleInviteMemberSubmit(e) {
 
 async function handleMemberRoleChange(email, newRole) {
   if (newRole === null) {
-    // Remove from members.
+    // Remove from members. Atomic: map delete + array erase land together so
+    // the routing index can never lag behind the membership map.
     try {
-      await db.collection('families').doc(state.currentFamilyId)
-        .update({ ['members.' + email]: firebase.firestore.FieldValue.delete() });
+      await db.collection('families').doc(state.currentFamilyId).update({
+        ['members.' + email]: firebase.firestore.FieldValue.delete(),
+        memberEmails: firebase.firestore.FieldValue.arrayRemove(email),
+      });
       renderMembersList();
     } catch (err) {
       alert('Error removing member: ' + err.message);
