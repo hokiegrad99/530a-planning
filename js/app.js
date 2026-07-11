@@ -56,6 +56,11 @@ const db   = firebase.firestore();
 const APP_REDIRECT_URL = window.location.origin +
   (window.location.pathname === '/' ? '/' : window.location.pathname.replace(/\/$/, ''));
 
+// Calendar-year floor for 530A contributions. 530A accounts became effective
+// 2026, so no contribution year can precede this. Update this single
+// constant if/when the floor moves.
+const MIN_TRACKED_YEAR = 2026;
+
 
 /* --------------------------------------------------------------------------
  * 1. App state
@@ -484,7 +489,7 @@ function render() {
 function setupYearDropdown() {
   const currentYear = new Date().getFullYear();
   const years = [];
-  for (let y = currentYear - 2; y <= currentYear + 5; y++) years.push(y);
+  for (let y = Math.max(MIN_TRACKED_YEAR, currentYear); y <= currentYear + 5; y++) years.push(y);
   dom.yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
   dom.yearSelect.value = state.selectedYear;
 
@@ -505,7 +510,7 @@ function updateYearDropdownWithOptions() {
   const current = new Set(Array.from(dom.yearSelect.options).map(o => parseInt(o.value, 10)));
   let updated = false;
   state.contributions.forEach(c => {
-    if (typeof c.year === 'number' && !current.has(c.year)) {
+    if (typeof c.year === 'number' && c.year >= MIN_TRACKED_YEAR && !current.has(c.year)) {
       const opt = document.createElement('option');
       opt.value = c.year;
       opt.textContent = c.year;
