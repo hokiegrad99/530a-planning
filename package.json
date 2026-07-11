@@ -1,0 +1,18 @@
+{
+  "name": "family-530a-tracker",
+  "version": "2.0.0",
+  "description": "Multi-tenant tracker for yearly contributions to children's 530A accounts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build:config": "node scripts/build-config.js",
+    "migrate": "node scripts/migrate-to-families.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
